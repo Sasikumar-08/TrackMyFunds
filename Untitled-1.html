@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>TRACK MY FUNDS</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* CSS to control the size of the chart */
+        #monthlyExpenseChart {
+            width: 150px !important;
+            height: 150px !important;
+        }
+    </style>
+</head>
+<body>
+
+
+    <div id="funds-section" style="display: none;">
+        <form id="funds-form">
+            <h1>TRACK MY FUNDS</h1>
+            <div class="input-section">
+                <label for="category_select">Category: </label>
+                <select id="category_select" name="category_select">
+                    <option value="Expense">Expense</option>
+                    <option value="Income">Income</option>
+                </select>
+
+                <div id="expense-type-section" style="display: none;">
+                    <label for="expense_type">Expense Type:</label> 
+                    <select id="expense_type">
+                        <option value="House Rent">House Rent</option>
+                        <option value="EMI">EMI</option>
+                        <option value="Shopping">Shopping</option>
+                        <option value="Petrol">Petrol</option>
+                    </select>
+                </div>
+
+                <label for="amount_input">Amount:</label>
+                <input type="number" id="amount_input" name="amount_input" required min="0.01" step="0.01">
+                <label for="info">Info:</label>
+                <input type="text" id="info" name="info" required>
+                <label for="date_input">Date:</label>
+                <input type="date" id="date_input" name="date_input" required>
+                <button type="button" id="add_btn">Add</button>
+            </div>
+        </form>
+
+        <div class="expenses-list">
+            <h2>Expenses and Incomes List</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Info</th>
+                        <th>Date</th>
+                        <th>Delete</th>
+                    </tr>
+                </thead>
+                <tbody id="expense-table-body">
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td>Total:</td>
+                        <td id="total-amount">0.00</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <h2>Monthly Expense Distribution</h2>
+        <canvas id="monthlyExpenseChart"></canvas>
+    </div>
+
+    <script>
+        // List of valid login credentials
+        const users = [
+            { username: "user1", password: "password1" },
+            { username: "user2", password: "password2" },
+            { username: "user3", password: "password3" }
+        ];
+
+        // Monthly expenses object
+        const monthlyExpenses = {};
+
+        // Track previous month's total expense for comparison
+        let previousMonthExpense = 0;
+
+        // Login event listener
+        document.getElementById('login-btn').addEventListener('click', () => {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Check if entered credentials match any in the users list
+            const isValidUser = users.some(user => user.username === username && user.password === password);
+
+            if (isValidUser) {
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('funds-section').style.display = 'block';
+            } else {
+                alert("Incorrect username or password. Please try again.");
+            }
+        });
+
+        // Show or hide the expense type dropdown based on the category selection
+        const categorySelect = document.getElementById('category_select');
+        const expenseTypeSection = document.getElementById('expense-type-section');
+        const infoInput = document.getElementById('info');
+
+        categorySelect.addEventListener('change', (e) => {
+            if (e.target.value === 'Expense') {
+                expenseTypeSection.style.display = 'block';
+                infoInput.value = ''; // Clear the info input if category changes
+            } else {
+                expenseTypeSection.style.display = 'none';
+                infoInput.value = ''; // Clear the info input if not an expense
+            }
+        });
+
+        // Automatically set Info field based on selected expense type
+        document.getElementById('expense_type').addEventListener('change', (e) => {
+            infoInput.value = e.target.value; // Set Info field to the selected expense type
+        });
+
+        // Event listener for Add button in funds form
+        document.getElementById('add_btn').addEventListener('click', (e) => {
+            e.preventDefault();
+
+            const category = categorySelect.value;
+            const amount = parseFloat(document.getElementById('amount_input').value);
+            const info = infoInput.value;
+            const date = document.getElementById('date_input').value;
+            const expenseType = document.getElementById('expense_type').value;
+            const displayCategory = category === "Expense" ? `${category} - ${expenseType}` : category;
+
+            if (isNaN(amount) || amount <= 0 || !date) {
+                alert("Please enter a valid amount and date.");
+                return;
+            }
+
+            const currentDate = new Date(date);
+            const currentMonth = `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}`;
+            const previousMonth = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
+
+            // Add to monthly expenses and check for 75% threshold
+            if (category === "Expense") {
+                monthlyExpenses[currentMonth] = (monthlyExpenses[currentMonth] || 0) + amount;
+
+                // Check if the current month's expense exceeds 75% of the previous month's total
+                previousMonthExpense = monthlyExpenses[previousMonth] || 0;
+                if (previousMonthExpense > 0 && monthlyExpenses[currentMonth] > 0.75 * previousMonthExpense) {
+                    alert("Warning: This month’s expenses have exceeded 75% of the previous month’s total.");
+                }
+            }
+
+            const tableBody = document.getElementById('expense-table-body');
+            const row = tableBody.insertRow();
+            row.innerHTML = `
+                <td>${displayCategory}</td>
+                <td>${amount.toFixed(2)}</td>
+                <td>${info}</td>
+                <td>${date}</td>
+                <td><button class="delete-btn">Delete</button></td>
+            `;
+
+            updateTotal(category, amount);
+
+            row.querySelector('.delete-btn').addEventListener('click', () => {
+                const confirmDelete = confirm("Are you sure you want to delete this entry?");
+                if (confirmDelete) {
+                    tableBody.deleteRow(row.rowIndex - 1);
+                    updateTotal(category, -amount);
+                }
+            });
+
+            document.getElementById('amount_input').value = '';
+            infoInput.value = '';
+            document.getElementById('date_input').value = '';
+
+            updateChart();
+        });
+
+        function updateTotal(category, amount) {
+            const totalElement = document.getElementById('total-amount');
+            let total = parseFloat(totalElement.textContent) || 0;
+            total += category === "Expense" ? -amount : amount;
+            totalElement.textContent = total.toFixed(2);
+        }
+
+        const ctx = document.getElementById('monthlyExpenseChart').getContext('2d');
+        const monthlyExpenseChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Monthly Expenses',
+                    data: [],
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
+                    ]
+                }]
+            }
+        });
+
+        function updateChart() {
+            monthlyExpenseChart.data.labels = Object.keys(monthlyExpenses);
+            monthlyExpenseChart.data.datasets[0].data = Object.values(monthlyExpenses);
+            monthlyExpenseChart.update();
+        }
+    </script>
+</body>
+</html>
